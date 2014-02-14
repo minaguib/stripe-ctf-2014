@@ -1,0 +1,17 @@
+#!/bin/bash
+
+monitor() {
+    lastremote=$( git ls-remote origin HEAD 2>/dev/null )
+    while true; do
+        echo `date` Checking
+        remote=$( git ls-remote origin HEAD 2>/dev/null )
+        if [ "$remote" != "$lastremote" ]; then
+            echo Detected remote change, exiting successfully
+            exit 0
+        fi
+        sleep 1
+    done
+}
+
+cd "current-round"
+monitor

@@ -1,0 +1,61 @@
+#!/bin/bash
+
+die_nicely() {
+  pkill solve
+  sleep 0.33
+  echo
+  exit
+}
+trap die_nicely SIGINT SIGQUIT
+
+launch() {
+  tree="$1"
+  parent="$2"
+  slot_id="$3"
+  slots="$4"
+  difficulty=$(cat difficulty.txt)
+  hostname=$( hostname )
+  payload=$( ../solve "$difficulty" "$tree" "$parent" "$hostname" "$slot_id" "$slots" )
+  if [ $? -eq 0 ]; then
+    pkill solve
+    echo Solve found a match
+    sha1=$( echo -n "$payload" | git hash-object -t commit --stdin -w )
+    echo "Mined a Gitcoin with commit: $sha1"
+    echo "Pushing it"
+    git push -f origin "$sha1":master
+    sleep 5
+    return 0
+  fi
+
+  #echo "Solver did not exit successfully - ignoring output"
+  echo -n "-"
+
+  return 1
+}
+
+loop() {
+  while true; do
+
+    tree=$(git write-tree)
+    parent=$(git rev-parse HEAD)
+    num_cores=$( grep -c ^processor /proc/cpuinfo )
+
+    echo Launching "$num_cores" solvers
+
+    for x in `seq 1 "$num_cores"`; do
+      launch "$tree" "$parent" "$((x-1))" &
+    done
+
+    for x in `seq 1 "$num_cores"`; do
+      wait
+    done
+
+    echo
+    echo All solvers have exited
+    echo
+
+  done
+}
+
+cd "current-round"
+loop
